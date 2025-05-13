@@ -63,7 +63,7 @@ const sampleParkingSpaces = [
 const seedDatabase = async () => {
   try {
     // Connect to MongoDB
-    await mongoose.connect('mongodb://localhost:27017/parking_system', {
+    await mongoose.connect('mongodb+srv://singhayush9454:ayush9454@cluster0.vwdb6k1.mongodb.net/parking_system?retryWrites=true&w=majority&appName=Cluster0/parking_system', {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
