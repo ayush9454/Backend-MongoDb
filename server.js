@@ -23,14 +23,33 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // MongoDB connection
-const mongoUri = process.env.MONGO_URI || 'mongodb+srv://singhayush9454:ayush9454@cluster0.vwdb6k1.mongodb.net/parking_system?retryWrites=true&w=majority&appName=Cluster0';
-mongoose.connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => {
+const connectDB = async () => {
+  try {
+    const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://singhayush9454:ayush9454@cluster0.vwdb6k1.mongodb.net/parking_system?retryWrites=true&w=majority&appName=Cluster0';
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
     console.log('Connected to MongoDB database');
-}).catch((err) => {
-    console.error('Error connecting to MongoDB:', err);
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  }
+};
+
+// Call connection function
+connectDB();
+
+// Add MongoDB connection error handlers
+mongoose.connection.on('error', err => {
+  console.error('MongoDB connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected. Attempting to reconnect...');
+  connectDB();
 });
 
 // Import models
@@ -58,16 +77,52 @@ app.get('/api', (req, res) => {
     });
 });
 
-// Get all parking spaces
+// Add this middleware before your routes
+const checkDbConnection = (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      error: 'Database connection not available',
+      details: 'The server is temporarily unable to handle the request'
+    });
+  }
+  next();
+};
+
+// Apply the middleware to all routes that need database access
+app.use('/api', checkDbConnection);
+
+// Replace the existing parking spaces route
 app.get('/api/parking-spaces', async (req, res) => {
     try {
+        // Check if MongoDB is connected
+        if (mongoose.connection.readyState !== 1) {
+            throw new Error('Database not connected');
+        }
+
         console.log('Fetching all parking spaces...');
-        const parkingSpaces = await ParkingSpace.find({});
+        const parkingSpaces = await ParkingSpace.find({})
+            .lean()
+            .timeout(5000); // 5 second timeout
+
+        if (!parkingSpaces) {
+            throw new Error('No parking spaces found');
+        }
+
         console.log(`Found ${parkingSpaces.length} parking spaces`);
         res.json(parkingSpaces);
     } catch (error) {
-        console.error('Error fetching parking spaces:', error);
-        res.status(500).json({ error: 'Failed to fetch parking spaces' });
+        console.error('Error fetching parking spaces:', error.message);
+        // Send more specific error messages
+        if (error.name === 'MongooseError') {
+            return res.status(500).json({ 
+                error: 'Database connection error',
+                details: error.message
+            });
+        }
+        res.status(500).json({ 
+            error: 'Failed to fetch parking spaces',
+            details: error.message
+        });
     }
 });
 
@@ -229,6 +284,12 @@ app.use((req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 5050;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+}
+
+// Export the Express app
+module.exports = app;
