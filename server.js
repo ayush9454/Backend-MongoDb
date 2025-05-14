@@ -146,7 +146,16 @@ app.post('/api/bookings', async (req, res) => {
 app.get('/api/bookings', async (req, res) => {
     try {
         const userId = req.query.userId;
-        const bookings = await Booking.find({ userId }).populate('parkingSpaceId');
+        // Find all bookings for the user
+        let bookings = await Booking.find({ userId }).populate('parkingSpaceId');
+        const now = new Date();
+        // Update expired bookings to completed
+        const expiredIds = bookings.filter(b => b.status !== 'completed' && b.status !== 'cancelled' && b.endTime < now).map(b => b._id);
+        if (expiredIds.length > 0) {
+            await Booking.updateMany({ _id: { $in: expiredIds } }, { $set: { status: 'completed' } });
+            // Re-fetch bookings to get updated statuses
+            bookings = await Booking.find({ userId }).populate('parkingSpaceId');
+        }
         res.json(bookings);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch bookings' });
@@ -157,7 +166,16 @@ app.get('/api/bookings', async (req, res) => {
 app.get('/api/bookings/history', async (req, res) => {
     try {
         const userId = req.query.userId;
-        const bookings = await Booking.find({ userId, status: { $in: ['cancelled', 'completed'] } }).populate('parkingSpaceId');
+        // Also update expired bookings to completed
+        let allBookings = await Booking.find({ userId }).populate('parkingSpaceId');
+        const now = new Date();
+        const expiredIds = allBookings.filter(b => b.status !== 'completed' && b.status !== 'cancelled' && b.endTime < now).map(b => b._id);
+        if (expiredIds.length > 0) {
+            await Booking.updateMany({ _id: { $in: expiredIds } }, { $set: { status: 'completed' } });
+            allBookings = await Booking.find({ userId }).populate('parkingSpaceId');
+        }
+        // Only return completed/cancelled
+        const bookings = allBookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
         res.json(bookings);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch booking history' });
