@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
+const dotenv = require('dotenv');
 const ParkingSpace = require('./models/ParkingSpace');
+
+// Load environment variables
+dotenv.config();
 
 const sampleParkingSpaces = [
   {
@@ -62,17 +66,22 @@ const sampleParkingSpaces = [
 
 const seedDatabase = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect('mongodb+srv://singhayush9454:ayush9454@cluster0.vwdb6k1.mongodb.net/parking_system?retryWrites=true&w=majority&appName=Cluster0/parking_system', {
+    // Connect to MongoDB using environment variable
+    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/parking_system';
+    await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
 
+    console.log('Connected to MongoDB');
+
     // Clear existing data
     await ParkingSpace.deleteMany({});
+    console.log('Cleared existing parking spaces');
 
     // Insert sample data
-    await ParkingSpace.insertMany(sampleParkingSpaces);
+    const result = await ParkingSpace.insertMany(sampleParkingSpaces);
+    console.log(`Successfully inserted ${result.length} parking spaces`);
 
     console.log('Database seeded successfully!');
     process.exit(0);

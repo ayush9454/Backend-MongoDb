@@ -54,7 +54,9 @@ app.get('/api', (req, res) => {
 // Get all parking spaces
 app.get('/api/parking-spaces', async (req, res) => {
     try {
+        console.log('Fetching all parking spaces...');
         const parkingSpaces = await ParkingSpace.find({});
+        console.log(`Found ${parkingSpaces.length} parking spaces`);
         res.json(parkingSpaces);
     } catch (error) {
         console.error('Error fetching parking spaces:', error);
