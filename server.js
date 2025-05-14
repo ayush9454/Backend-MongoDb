@@ -16,7 +16,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // MongoDB connection
-const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/parking_system';
+const mongoUri = process.env.MONGO_URI || 'mongodb+srv://singhayush9454:ayush9454@cluster0.vwdb6k1.mongodb.net/parking_system?retryWrites=true&w=majority&appName=Cluster0';
 mongoose.connect(mongoUri, {
     useNewUrlParser: true,
     useUnifiedTopology: true
@@ -100,10 +100,25 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(400).json({ error: 'Invalid credentials' });
-    res.json({ userId: user._id, name: user.name, email: user.email });
+    
+    // Create JWT token
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+    
+    res.json({
+      userId: user._id,
+      name: user.name,
+      email: user.email,
+      token: token
+    });
   } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
 });
@@ -209,4 +224,4 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
-}); 
+});
