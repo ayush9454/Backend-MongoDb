@@ -31,9 +31,24 @@ const ParkingSpace = require('./models/ParkingSpace');
 const Booking = require('./models/Booking');
 const User = require('./models/User');
 
-// Routes
+// Root route
 app.get('/', (req, res) => {
     res.json({ message: 'Welcome to Smart Parking Management System API' });
+});
+
+// API root route
+app.get('/api', (req, res) => {
+    res.json({ 
+        message: 'Smart Parking API is running',
+        endpoints: {
+            parkingSpaces: '/api/parking-spaces',
+            auth: {
+                login: '/api/auth/login',
+                register: '/api/auth/register'
+            },
+            bookings: '/api/bookings'
+        }
+    });
 });
 
 // Get all parking spaces
@@ -163,6 +178,11 @@ app.post('/api/bookings/:id/cancel', async (req, res) => {
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ message: 'Something went wrong!' });
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ error: 'Route not found' });
 });
 
 // Start server
