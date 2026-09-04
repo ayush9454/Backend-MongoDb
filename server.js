@@ -46,7 +46,7 @@ async function connectDB() {
 
   isConnecting = (async () => {
     let mongoUri = process.env.MONGO_URI;
-    if (!mongoUri || mongoUri.includes('cluster0.vwdb6k1.mongodb.net')) {
+    if (!mongoUri) {
       if (process.env.VERCEL) {
         throw new Error('MONGO_URI environment variable is missing in Vercel project settings!');
       }
@@ -68,6 +68,10 @@ async function connectDB() {
         console.warn('Could not start embedded MongoDB, falling back to local MongoDB URI:', memErr.message);
         mongoUri = 'mongodb://127.0.0.1:27017/parking_system';
       }
+    }
+
+    if (mongoUri && mongoUri.includes('.mongodb.net/?')) {
+      mongoUri = mongoUri.replace('.mongodb.net/?', '.mongodb.net/parking_system?');
     }
 
     await mongoose.connect(mongoUri, {
