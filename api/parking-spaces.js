@@ -1,5 +1,6 @@
 const dbConnect = require('../utils/db');
 const ParkingSpace = require('../models/ParkingSpace');
+const Booking = require('../models/Booking');
 
 module.exports = async (req, res) => {
   // Handle CORS preflight requests
@@ -14,11 +15,32 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   try {
-    console.log('Attempting database connection...');
     await dbConnect();
-    console.log('Database connection successful, attempting to fetch parking spaces...');
+    // Sync expired bookings and heal spot availability
+    const now = new Date();
+    const expiredBookings = await Booking.find({
+      status: { $in: ['active', 'confirmed'] },
+      endTime: { $lt: now }
+    });
+    for (const booking of expiredBookings) {
+      booking.status = 'completed';
+      await booking.save();
+    }
+    const spaces = await ParkingSpace.find({});
+    for (const space of spaces) {
+      const activeCount = await Booking.countDocuments({
+        parkingSpaceId: space._id,
+        status: { $in: ['active', 'confirmed'] },
+        endTime: { $gte: now }
+      });
+      const correctAvailable = Math.max(0, space.capacity - activeCount);
+      if (space.availableSpots !== correctAvailable) {
+        space.availableSpots = correctAvailable;
+        await space.save();
+      }
+    }
+
     const parkingSpaces = await ParkingSpace.find({});
-    console.log(`Fetched ${parkingSpaces.length} parking spaces.`);
     res.status(200).json(parkingSpaces);
   } catch (error) {
     console.error('Error in /api/parking-spaces:', error);

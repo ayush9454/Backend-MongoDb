@@ -93,6 +93,9 @@ async function connectDB() {
     } catch (seedErr) {
       console.error('Auto-seed check error:', seedErr.message);
     }
+
+    // Auto-reconcile and heal parking spot availability
+    await reconcileAvailableSpots();
   })();
 
   try {
@@ -101,6 +104,51 @@ async function connectDB() {
     isConnecting = null;
   }
 }
+
+// Function to sync expired bookings and restore parking spot availability
+async function syncExpiredBookings() {
+  try {
+    const now = new Date();
+    const expiredBookings = await Booking.find({
+      status: { $in: ['active', 'confirmed'] },
+      endTime: { $lt: now }
+    });
+    if (expiredBookings.length > 0) {
+      for (const booking of expiredBookings) {
+        booking.status = 'completed';
+        await booking.save();
+      }
+    }
+  } catch (err) {
+    console.error('Error syncing expired bookings:', err.message);
+  }
+}
+
+// Function to recalculate available spots based on actual active bookings
+async function reconcileAvailableSpots() {
+  try {
+    await syncExpiredBookings();
+    const now = new Date();
+    const spaces = await ParkingSpace.find({});
+    for (const space of spaces) {
+      const activeCount = await Booking.countDocuments({
+        parkingSpaceId: space._id,
+        status: { $in: ['active', 'confirmed'] },
+        endTime: { $gte: now }
+      });
+      const correctAvailable = Math.max(0, space.capacity - activeCount);
+      if (space.availableSpots !== correctAvailable) {
+        space.availableSpots = correctAvailable;
+        await space.save();
+      }
+    }
+  } catch (err) {
+    console.error('Error reconciling available spots:', err.message);
+  }
+}
+
+// Periodic background sync every 60 seconds
+setInterval(reconcileAvailableSpots, 60000);
 
 // Health check roots (work immediately without DB wait)
 app.get(['/', '/api'], (req, res) => {
@@ -134,6 +182,7 @@ const apiRouter = express.Router();
 // Get all parking spaces
 apiRouter.get('/parking-spaces', async (req, res) => {
   try {
+    await reconcileAvailableSpots();
     console.log('Fetching all parking spaces...');
     const parkingSpaces = await ParkingSpace.find({});
     console.log(`Found ${parkingSpaces.length} parking spaces`);
@@ -240,17 +289,9 @@ apiRouter.post('/bookings', async (req, res) => {
 // Get all bookings for a user
 apiRouter.get('/bookings', async (req, res) => {
   try {
+    await reconcileAvailableSpots();
     const userId = req.query.userId;
-    // Find all bookings for the user
-    let bookings = await Booking.find({ userId }).populate('parkingSpaceId');
-    const now = new Date();
-    // Update expired bookings to completed
-    const expiredIds = bookings.filter(b => b.status !== 'completed' && b.status !== 'cancelled' && b.endTime < now).map(b => b._id);
-    if (expiredIds.length > 0) {
-      await Booking.updateMany({ _id: { $in: expiredIds } }, { $set: { status: 'completed' } });
-      // Re-fetch bookings to get updated statuses
-      bookings = await Booking.find({ userId }).populate('parkingSpaceId');
-    }
+    const bookings = await Booking.find({ userId }).populate('parkingSpaceId');
     res.json(bookings);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch bookings: ' + error.message });
@@ -260,15 +301,9 @@ apiRouter.get('/bookings', async (req, res) => {
 // Get booking history for a user
 apiRouter.get('/bookings/history', async (req, res) => {
   try {
+    await reconcileAvailableSpots();
     const userId = req.query.userId;
-    let allBookings = await Booking.find({ userId }).populate('parkingSpaceId');
-    const now = new Date();
-    const expiredIds = allBookings.filter(b => b.status !== 'completed' && b.status !== 'cancelled' && b.endTime < now).map(b => b._id);
-    if (expiredIds.length > 0) {
-      await Booking.updateMany({ _id: { $in: expiredIds } }, { $set: { status: 'completed' } });
-      allBookings = await Booking.find({ userId }).populate('parkingSpaceId');
-    }
-    // Only return completed/cancelled
+    const allBookings = await Booking.find({ userId }).populate('parkingSpaceId');
     const bookings = allBookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
     res.json(bookings);
   } catch (error) {
