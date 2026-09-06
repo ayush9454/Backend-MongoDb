@@ -179,10 +179,10 @@ apiRouter.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    if (!user) return res.status(400).json({ error: 'User Not Found' });
     
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ error: 'Invalid credentials' });
+    if (!match) return res.status(400).json({ error: 'Wrong Password!' });
     
     // Create JWT token
     const token = jwt.sign(
