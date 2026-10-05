@@ -1,29 +1,25 @@
-# Smart Parking Backend
+# Smart Parking API
 
-## Vercel Deployment
+This repository deploys independently to Vercel and also runs locally with Node.js 24. Shared contracts are included as the local `vendor/contracts` package; no private npm registry or sibling repository is required.
 
-This backend is now structured for deployment on Vercel as serverless functions. Each API route is a separate file in the `api/` directory.
-
-### Steps to Deploy
-
-1. Push this backend to a GitHub repository.
-2. Go to [vercel.com](https://vercel.com/) and import your repository.
-3. Set the environment variable `MONGO_URI` in the Vercel dashboard (Project Settings > Environment Variables).
-4. Deploy!
-
-### After Deployment
-- Note your Vercel backend URL (e.g., `https://your-backend.vercel.app/api`).
-- Update the frontend's `API_BASE_URL` in `frontend/src/services/api.ts` to point to your new backend URL.
-
----
-
-## Local Development
-
-You can still run the original Express server locally using `server.js` if needed:
-
-```bash
-npm install
-npm run dev
+```sh
+npm ci
+cp .env.example .env
+npm start
 ```
 
-But for Vercel, use the serverless functions in the `api/` directory. 
+Local startup creates a private development secret and runs a persistent embedded MongoDB replica set when `MONGO_URI` is absent. First launch requires an internet connection to download the MongoDB binary. Preserve `.mongo_data/`, `.mongo_data.config.json`, and `.dev-secrets.json`.
+
+## Existing database
+
+Stop application writers and take a database snapshot before migration. Review with `npm run migrate -- --dry-run`, then apply with `npm run migrate`. Apply creates a private Extended JSON backup in `backups/`; unresolved integrity problems stop conversion. Users/bookings are preserved. Resolve invalid emails, orphan references, and overlapping capacity conflicts against the original data before applying. `npm run restore -- /path/to/backup.json` restores into an empty database; `--replace` is required for a populated target and creates a pre-restore backup. Backups can contain legacy payment fields and must be protected.
+
+## Vercel settings
+
+Keep the Vercel project root at this repository root. `vercel.json` exports the shared Express API from `server.js`. Configure Node 24, `NODE_ENV=production`, `MONGO_URI` with an explicit database name on a replica set, a private `JWT_SECRET` of at least 32 characters, a separate `MAINTENANCE_SECRET` of at least 32 characters, and comma-separated exact frontend URLs in `CORS_ORIGINS`. Migrate before directing production traffic to API v2. JWT token changes require users to sign in again.
+
+Schedule a POST to `/api/maintenance/expire` every minute using the maintenance bearer secret. `/health/live` verifies HTTP availability; `/health/ready` verifies the database. Enforce shared rate limits at the deployment gateway for multiple instances. Payments are simulated; no real card collection or charges.
+
+Checks: `npm run lint`, `npm test`, `npm run test:persistence`. See [API](docs/API.md) and [verification notes](docs/VALIDATION.md).
+
+The local combined workspace retains the canonical contracts and docs. Run its `npm run sync:repos` after changing them and `npm run check:repos` before pushing either repository.

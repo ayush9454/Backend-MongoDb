@@ -1,20 +1,24 @@
 {
-  "name": "parking-system-backend",
-  "version": "1.0.0",
+  "name": "backend",
+  "version": "2.0.0",
   "main": "server.js",
   "engines": {
     "node": "24.x"
   },
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "lint": "eslint src scripts tests server.js seed.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node seed.js",
+    "test:persistence": "node scripts/check-persistence.js",
+    "restore": "node scripts/restore.js"
   },
   "keywords": [
     "parking",
-    "management",
-    "nodejs",
     "express",
-    "mysql"
+    "mongodb"
   ],
   "author": "",
   "license": "ISC",
@@ -23,12 +27,15 @@
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
-    "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.0",
-    "mongoose": "^6.0.0"
+    "mongoose": "^6.0.0",
+    "@smart-parking/contracts": "file:vendor/contracts",
+    "mongodb-memory-server": "^11.2.0",
+    "bson": "^4.7.2"
   },
   "devDependencies": {
-    "mongodb-memory-server": "^11.2.0",
-    "nodemon": "^2.0.22"
-  }
+    "eslint": "^8.57.1"
+  },
+  "private": true,
+  "description": "Transactional Smart Parking API"
 }
