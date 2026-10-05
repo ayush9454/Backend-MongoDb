@@ -1,6 +1,6 @@
 # Implementation verification
 
-Checks use isolated data. Existing local database files were preserved and a disposable copy was inspected for migration compatibility. The copy opens successfully, retains the legacy `test` database, and reports one invalid user email requiring operator correction before migration can apply. Original application records have not been migrated or reset.
+Automated checks use isolated data. On 2026-10-05, the operator authorized deletion of the invalid-email local user. A full Extended JSON backup was taken first; the user had no linked bookings. Only that user was deleted, and the 26 remaining migration changes applied without integrity conflicts. A subsequent database startup succeeded, retained the legacy `test` database, and confirmed the user remained absent. Private backups are stored locally in `backend/backups/` and are excluded from Git. The production database has not been accessed or migrated.
 
 The backend suite covers JWT verification, ownership, input validation, server pricing, concurrent last-spot allocation, idempotent retries, rollback, concurrent cancellation, expiry, future legacy interval conflicts, pagination, maintenance credentials, CORS, repeatable seeding, migration preservation, healthy-data detection, capacity conflicts, orphans, and email collisions.
 
